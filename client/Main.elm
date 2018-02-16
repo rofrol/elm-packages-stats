@@ -15,7 +15,7 @@ import LineChart.Legends as Legends
 import LineChart.Container as Container
 import LineChart.Interpolation as Interpolation
 import LineChart.Axis.Intersection as Intersection
-import Date exposing (Date)
+import Date exposing (Date, toTime)
 import Time exposing (Time)
 import Style exposing (..)
 import Style.Scale as Scale
@@ -24,13 +24,16 @@ import Style.Color as Color
 import Style.Font as Font
 import Element exposing (..)
 import Element.Attributes exposing (..)
+import Http
+import Json.Decode exposing (list, field, float)
+import Json.Decode.Extra exposing (date)
 
 
 -- MOCK DATA
 
 
 type alias Entry =
-    { date : Time
+    { date : Date
     , count : Float
     }
 
@@ -64,18 +67,35 @@ stylesheet =
 
 type Msg
     = RequestPackageCounts
+    | LoadPackageCounts (Result Http.Error (List Entry))
 
 
 type alias Model =
     { packageCounts : List Entry
+    , error : Maybe String
     }
+
+
+decodeEntry =
+    Json.Decode.map2 Entry
+        (field "date" date)
+        (field "count" float)
+
+
+decodePackageCounts : Json.Decode.Decoder (List Entry)
+decodePackageCounts =
+    (list decodeEntry)
+
+
+requestPackageCounts : Cmd Msg
+requestPackageCounts =
+    Http.get "http://localhost:8002/" decodePackageCounts
+        |> Http.send LoadPackageCounts
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { packageCounts = [ { date = 10 * Time.second, count = 222 } ] }
-    , Cmd.none
-    )
+    { packageCounts = [], error = Nothing } ! [ requestPackageCounts ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -83,6 +103,12 @@ update msg model =
     case msg of
         RequestPackageCounts ->
             model ! []
+
+        LoadPackageCounts (Ok entries) ->
+            { model | packageCounts = entries } ! []
+
+        LoadPackageCounts err ->
+            { model | error = Just <| "Could not get package counts from server. Error was: " ++ (toString err) } ! []
 
 
 type Spacing
@@ -124,6 +150,11 @@ mySpacing size =
         scale num
 
 
+displayError : String -> Element MyStyles variation Msg
+displayError error =
+    text error
+
+
 view : Model -> Html Msg
 view model =
     Element.layout stylesheet <|
@@ -135,7 +166,12 @@ view model =
                 ]
             , row ElContainer
                 []
-                [ chart model.packageCounts
+                [ case model.error of
+                    Just err ->
+                        displayError err
+
+                    Nothing ->
+                        chart model.packageCounts
                 ]
             ]
 
@@ -143,7 +179,7 @@ view model =
 chartConfig : List Entry -> LineChart.Config Entry Msg
 chartConfig entries =
     { y = Axis.default 450 "Count" .count
-    , x = Axis.time 1270 "Date" .date
+    , x = Axis.time 1270 "Date" (.date >> toTime)
     , container = Container.default "line-chart-1"
     , interpolation = Interpolation.default
     , intersection = Intersection.default
