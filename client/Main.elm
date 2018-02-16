@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Html exposing (Html)
+import Html exposing (..)
 import LineChart
 import LineChart.Axis as Axis
 import LineChart.Area as Area
@@ -16,16 +16,8 @@ import LineChart.Container as Container
 import LineChart.Interpolation as Interpolation
 import LineChart.Axis.Intersection as Intersection
 import Date exposing (Date, toTime)
-import Time exposing (Time)
-import Style exposing (..)
-import Style.Scale as Scale
-import Color
-import Style.Color as Color
-import Style.Font as Font
-import Element exposing (..)
-import Element.Attributes exposing (..)
 import Http
-import Json.Decode exposing (list, field, float)
+import Json.Decode exposing (Decoder, field, list, float)
 import Json.Decode.Extra exposing (date)
 
 
@@ -36,33 +28,6 @@ type alias Entry =
     { date : Date
     , count : Float
     }
-
-
-
--- STYLESHEET (USING STYLE-ELEMENTS)
-
-
-scale : Int -> Float
-scale =
-    Scale.modular 16 1.618
-
-
-type MyStyles
-    = Title
-    | ElContainer
-    | None
-
-
-stylesheet : StyleSheet MyStyles variation
-stylesheet =
-    Style.styleSheet
-        [ style Title
-            [ Color.text Color.darkCharcoal
-            , Font.size (scale 3)
-            ]
-        , style ElContainer
-            []
-        ]
 
 
 type Msg
@@ -76,6 +41,7 @@ type alias Model =
     }
 
 
+decodeEntry : Decoder Entry
 decodeEntry =
     Json.Decode.map2 Entry
         (field "date" date)
@@ -111,69 +77,23 @@ update msg model =
             { model | error = Just <| "Could not get package counts from server. Error was: " ++ (toString err) } ! []
 
 
-type Spacing
-    = Large
-    | XLarge
-    | XXLarge
-    | Base
-    | Small
-    | XSmall
-    | XXSmall
-
-
-mySpacing : Spacing -> Float
-mySpacing size =
-    let
-        num =
-            case size of
-                Large ->
-                    5
-
-                XLarge ->
-                    6
-
-                XXLarge ->
-                    7
-
-                Base ->
-                    4
-
-                Small ->
-                    3
-
-                XSmall ->
-                    2
-
-                XXSmall ->
-                    1
-    in
-        scale num
-
-
-displayError : String -> Element MyStyles variation Msg
+displayError : String -> Html Msg
 displayError error =
     text error
 
 
 view : Model -> Html Msg
 view model =
-    Element.layout stylesheet <|
-        column None
-            [ center ]
-            [ row ElContainer
-                [ spacingXY (mySpacing Small) (mySpacing Large) ]
-                [ el Title [] (text "Elm Package Counts")
-                ]
-            , row ElContainer
-                []
-                [ case model.error of
-                    Just err ->
-                        displayError err
+    main_
+        []
+        [ h1 [] [ text "Elm Package Counts" ]
+        , case model.error of
+            Just err ->
+                displayError err
 
-                    Nothing ->
-                        chart model.packageCounts
-                ]
-            ]
+            Nothing ->
+                chart model.packageCounts
+        ]
 
 
 chartConfig : List Entry -> LineChart.Config Entry Msg
@@ -193,11 +113,10 @@ chartConfig entries =
     }
 
 
-chart : List Entry -> Element MyStyles variation Msg
+chart : List Entry -> Html Msg
 chart entries =
-    html <|
-        LineChart.viewCustom (chartConfig entries)
-            [ LineChart.line Colors.blue Dots.circle "Packages" entries ]
+    LineChart.viewCustom (chartConfig entries)
+        [ LineChart.line Colors.blue Dots.circle "Packages" entries ]
 
 
 subscriptions : Model -> Sub Msg
