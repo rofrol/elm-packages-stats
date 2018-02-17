@@ -38,7 +38,7 @@ update msg model =
             model ! []
 
         LoadPackageCounts (Ok entries) ->
-            { model | packageCounts = entries } ! []
+            { model | packageCounts = Debug.log "entries" entries } ! []
 
         LoadPackageCounts err ->
             { model | error = Just <| "Could not get package counts from server. Error was: " ++ (toString err) } ! []
